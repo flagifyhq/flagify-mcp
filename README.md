@@ -31,13 +31,13 @@
 
 ## Overview
 
-The official Flagify [Model Context Protocol](https://modelcontextprotocol.io) server. Connects any MCP-compatible host -- Claude Desktop, Claude Code, Cursor, Zed, Windsurf -- to your Flagify project so agents can list, create, toggle, and audit feature flags without leaving the editor.
+Flagify's [Model Context Protocol](https://modelcontextprotocol.io) server. Lets any MCP host (Claude Desktop, Claude Code, Cursor, Zed, Windsurf) read and change your feature flags without leaving the editor.
 
-- **Zero-config auth** -- Shares tokens with the Flagify CLI via `~/.flagify/config.json`
-- **12 tools** -- Full CRUD over flags, environments, segments, targeting rules, and the audit log
-- **Destructive-aware** -- Mutations carry `destructiveHint: true` so hosts highlight them in consent prompts
-- **Audit-tagged** -- Every change appears in the audit log with `source: "mcp"`
-- **Streaming-friendly** -- Stdio transport, no local server to manage
+- **Zero-config auth** -- reads the same `~/.flagify/config.json` the Flagify CLI writes on `flagify login`
+- **12 tools** -- list, create, update, toggle, archive; plus environments, segments, targeting rules, and the audit log
+- **Destructive mutations are tagged** with `destructiveHint: true` so hosts can flag them in their consent UI
+- **Every change lands in the audit log** with `source: "mcp"`, so you can tell MCP-driven edits apart from CLI or console ones
+- **Stdio only** -- nothing to host, nothing to restart
 
 ## Table of contents
 
@@ -53,7 +53,7 @@ The official Flagify [Model Context Protocol](https://modelcontextprotocol.io) s
 
 ### Claude Desktop
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS (or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
@@ -70,7 +70,7 @@ Fully quit Claude Desktop (`Cmd+Q`) and reopen.
 
 ### Claude Code
 
-Add a `.mcp.json` at the root of any project:
+Drop a `.mcp.json` at the root of any project:
 
 ```json
 {
@@ -83,7 +83,7 @@ Add a `.mcp.json` at the root of any project:
 }
 ```
 
-Run `/mcp` inside Claude Code.
+Then run `/mcp` inside Claude Code.
 
 ### Cursor
 
@@ -132,7 +132,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 ## Authentication
 
-The MCP server reads your JWT from `~/.flagify/config.json` -- the same file the Flagify CLI writes. Install the CLI and log in once:
+The server reads your JWT from `~/.flagify/config.json`. That's the same file the Flagify CLI writes, so you log in once from the CLI and the MCP picks it up.
 
 ```bash
 npm install -g @flagify/cli
@@ -146,9 +146,9 @@ flagify login
 flagify projects pick
 ```
 
-No manual token pasting, no `.env` files. The server automatically refreshes expired tokens and persists the rotated pair back to the config.
+If the access token expires, the server calls `/v1/auth/refresh` with the stored refresh token and writes the rotated pair back to the config file. You won't see a prompt, it just keeps going.
 
-API keys (`pk_*`, `sk_*`) are **not** accepted -- they're scoped to flag evaluation, not management. Use JWT.
+API keys (`pk_*`, `sk_*`) are rejected. Those are scoped to flag evaluation, not management, so any mutation would fail with a 403. Use the JWT flow.
 
 ## Available tools
 
@@ -169,7 +169,7 @@ API keys (`pk_*`, `sk_*`) are **not** accepted -- they're scoped to flag evaluat
 
 ## Configuration
 
-All environment variables are optional -- without them the server uses whatever `flagify login` and `flagify projects pick` wrote to `~/.flagify/config.json`.
+Everything below is optional. Without it, the server uses whatever `flagify login` and `flagify projects pick` put in `~/.flagify/config.json`.
 
 | Variable | Purpose |
 |----------|---------|
@@ -178,7 +178,7 @@ All environment variables are optional -- without them the server uses whatever 
 | `FLAGIFY_WORKSPACE_ID` | Override the default workspace |
 | `FLAGIFY_PROJECT_ID` | Override the default project |
 
-Set them in the MCP host's config:
+Pass them through the MCP host's config:
 
 ```json
 {
@@ -199,17 +199,17 @@ Set them in the MCP host's config:
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| "Could not attach to MCP server flagify" | Host's `PATH` doesn't include `npx`/`node` when launched from GUI | Use absolute paths: `"command": "/opt/homebrew/bin/npx"` |
-| Tool call fails with `MissingAuthError` | Never ran `flagify login` | Install `@flagify/cli` and log in |
-| Tool call fails with `MissingScopeError` | No default project picked | `flagify projects pick`, or set `FLAGIFY_PROJECT_ID` |
-| HTTP 401 persists after refresh | Refresh token expired | `flagify login` again |
-| `list_flags` returns stale data | 30s in-memory cache (intentional) | Call a mutation (invalidates) or restart the MCP host |
+| "Could not attach to MCP server flagify" | The host's `PATH` when launched from a GUI doesn't include `npx`/`node` | Switch to absolute paths, e.g. `"command": "/opt/homebrew/bin/npx"` |
+| Tool call fails with `MissingAuthError` | No `flagify login` yet | Install `@flagify/cli` and log in |
+| Tool call fails with `MissingScopeError` | No default project picked | Run `flagify projects pick`, or set `FLAGIFY_PROJECT_ID` |
+| HTTP 401 after the server tries to refresh | Refresh token expired too | Run `flagify login` again |
+| `list_flags` returns stale data | 30-second in-memory cache (intentional) | Do a mutation (invalidates the cache) or restart the host |
 
 ### Logs
 
-- **Claude Desktop**: `~/Library/Logs/Claude/mcp-server-flagify.log`
-- **Claude Code**: emitted to the session `/mcp` view
-- **Raw debug**: pipe a JSON-RPC message into the binary directly
+- Claude Desktop: `~/Library/Logs/Claude/mcp-server-flagify.log`
+- Claude Code: shown inline in the `/mcp` view
+- Raw debug: pipe a JSON-RPC frame into the binary
 
 ```bash
 printf '%s\n%s\n' \
@@ -219,8 +219,6 @@ printf '%s\n%s\n' \
 ```
 
 ## Development
-
-Clone and run locally:
 
 ```bash
 git clone https://github.com/flagifyhq/flagify-mcp.git
