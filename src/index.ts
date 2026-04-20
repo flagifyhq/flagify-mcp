@@ -7,6 +7,11 @@ import { registerListEnvironments } from "./tools/list-environments.js";
 import { registerListSegments } from "./tools/list-segments.js";
 import { registerGetTargetingRules } from "./tools/get-targeting-rules.js";
 import { registerGetAuditLog } from "./tools/get-audit-log.js";
+import { registerCreateFlag } from "./tools/create-flag.js";
+import { registerUpdateFlag } from "./tools/update-flag.js";
+import { registerDeleteFlag } from "./tools/delete-flag.js";
+import { registerToggleFlag } from "./tools/toggle-flag.js";
+import { registerUpdateTargetingRules } from "./tools/update-targeting-rules.js";
 
 const PACKAGE_VERSION = "0.0.1";
 
@@ -31,12 +36,20 @@ async function main(): Promise<void> {
     }),
   );
 
+  // Read-only
   registerListFlags(server);
   registerGetFlag(server);
   registerListEnvironments(server);
   registerListSegments(server);
   registerGetTargetingRules(server);
   registerGetAuditLog(server);
+
+  // Mutations (destructiveHint: true)
+  registerCreateFlag(server);
+  registerUpdateFlag(server);
+  registerDeleteFlag(server);
+  registerToggleFlag(server);
+  registerUpdateTargetingRules(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
