@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
+import { registerListFlags } from "./tools/list-flags.js";
 
 const PACKAGE_VERSION = "0.0.1";
 
@@ -28,6 +28,8 @@ async function main(): Promise<void> {
       ],
     }),
   );
+
+  registerListFlags(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
