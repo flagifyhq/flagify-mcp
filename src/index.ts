@@ -13,7 +13,7 @@ import { registerDeleteFlag } from "./tools/delete-flag.js";
 import { registerToggleFlag } from "./tools/toggle-flag.js";
 import { registerUpdateTargetingRules } from "./tools/update-targeting-rules.js";
 
-const PACKAGE_VERSION = "0.0.1";
+const PACKAGE_VERSION = "0.1.0";
 
 async function main(): Promise<void> {
   const server = new McpServer({

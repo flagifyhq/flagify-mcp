@@ -35,7 +35,7 @@ export class FlagifyApiClient {
     this.apiUrl = options.apiUrl;
     this.accessToken = options.accessToken;
     this.refreshToken = options.refreshToken;
-    this.userAgent = options.userAgent ?? "flagify-mcp/0.0.1";
+    this.userAgent = options.userAgent ?? "flagify-mcp/0.1.0";
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.cacheTtlMs = Math.max(0, options.cacheTtlSeconds ?? 0) * 1000;
   }

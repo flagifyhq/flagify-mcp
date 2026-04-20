@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run lint
+
+      - name: Build
+        run: pnpm run build
+
+      - name: MCP protocol conformance (tools/list)
+        run: |
+          printf '%s\n%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0.0.1"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | node dist/index.js \
+            | tee /tmp/mcp.out
+          grep -q '"name":"ping"' /tmp/mcp.out
+          grep -q '"name":"list_flags"' /tmp/mcp.out
+          grep -q '"name":"toggle_flag"' /tmp/mcp.out
+          grep -q '"destructiveHint":true' /tmp/mcp.out
