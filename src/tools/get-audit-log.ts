@@ -20,6 +20,12 @@ const inputSchema = {
     .optional()
     .describe("Filter by resource type (e.g. 'flag', 'environment', 'segment')."),
   actor_user_id: z.string().optional().describe("Filter by actor user ID."),
+  source: z
+    .enum(["api", "cli", "mcp", "ide", "web"])
+    .optional()
+    .describe(
+      "Filter by the surface that made the change. Use `mcp` to see only MCP-driven edits, `cli` for terminal usage, `web` for the console.",
+    ),
   project_id: z
     .string()
     .optional()
@@ -49,6 +55,7 @@ export function registerGetAuditLog(server: McpServer): void {
       if (input.action) qs.set("action", input.action);
       if (input.resource_type) qs.set("resourceType", input.resource_type);
       if (input.actor_user_id) qs.set("actorUserId", input.actor_user_id);
+      if (input.source) qs.set("source", input.source);
       if (input.cursor) qs.set("cursor", input.cursor);
       const projectId = input.project_id ?? ctx.scope.projectId;
       if (projectId) qs.set("projectId", projectId);

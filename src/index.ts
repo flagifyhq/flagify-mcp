@@ -12,8 +12,7 @@ import { registerUpdateFlag } from "./tools/update-flag.js";
 import { registerDeleteFlag } from "./tools/delete-flag.js";
 import { registerToggleFlag } from "./tools/toggle-flag.js";
 import { registerUpdateTargetingRules } from "./tools/update-targeting-rules.js";
-
-const PACKAGE_VERSION = "0.1.0";
+import { PACKAGE_VERSION } from "./version.js";
 
 async function main(): Promise<void> {
   const server = new McpServer({

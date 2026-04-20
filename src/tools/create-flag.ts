@@ -63,12 +63,12 @@ export function registerCreateFlag(server: McpServer): void {
         `/v1/projects/${encodeURIComponent(projectId)}/flags`,
         body,
       );
-      if (res.status !== 200 && res.status !== 201) {
+      if ((res.status !== 200 && res.status !== 201) || !res.body) {
         return toolError(formatHttpError("create_flag", res.status, res.errorMessage));
       }
 
       ctx.client.invalidateCache();
-      const flag = res.body!;
+      const flag = res.body;
       return {
         content: [
           {

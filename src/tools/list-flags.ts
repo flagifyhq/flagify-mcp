@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Flag } from "../client/types.js";
 import { getToolContext, requireProjectId } from "./context.js";
+import { toolError } from "./helpers.js";
 
 const inputSchema = {
   project_id: z
@@ -71,9 +72,3 @@ function renderFlagsSummary(flags: Flag[], projectId: string): string {
   return lines.join("\n");
 }
 
-function toolError(message: string) {
-  return {
-    isError: true,
-    content: [{ type: "text" as const, text: message }],
-  };
-}

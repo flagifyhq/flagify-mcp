@@ -20,6 +20,10 @@ export interface BrowserLoginResult {
  * Ports cli/cmd/login.go:82 loginBrowser to TS. Binds localhost:<random>,
  * opens the console's /auth/cli-auth page with p=<port>&did=<deviceID>, and
  * resolves when the console redirects to /callback with tokens.
+ *
+ * @internal — not wired to any MCP tool in v0.1.0. Kept in-tree so a future
+ * `login` tool can trigger the flow on-demand. Not part of the public API;
+ * no semver guarantee on its signature.
  */
 export async function browserLogin(
   opts: BrowserLoginOptions,

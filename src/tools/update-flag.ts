@@ -55,11 +55,11 @@ export function registerUpdateFlag(server: McpServer): void {
         `/v1/flags/${encodeURIComponent(flag.id)}`,
         body,
       );
-      if (res.status !== 200) {
+      if (res.status !== 200 || !res.body) {
         return toolError(formatHttpError("update_flag", res.status, res.errorMessage));
       }
 
-      const updated = res.body!;
+      const updated = res.body;
       return {
         content: [
           { type: "text", text: `Updated flag ${updated.key} (${updated.id}).` },

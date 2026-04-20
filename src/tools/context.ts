@@ -25,6 +25,15 @@ export class MissingAuthError extends Error {
   }
 }
 
+export class InvalidTokenError extends Error {
+  constructor(prefix: string) {
+    super(
+      `Found a Flagify API key (${prefix}...) instead of a JWT. API keys can only evaluate flags, not manage them — every mutation will 403. Run \`flagify login\` to get a user JWT, or set FLAGIFY_ACCESS_TOKEN to an access token.`,
+    );
+    this.name = "InvalidTokenError";
+  }
+}
+
 export class MissingScopeError extends Error {
   constructor(missing: "projectId" | "workspaceId") {
     super(
@@ -48,6 +57,9 @@ export async function getToolContext(): Promise<ToolContext> {
   const config = await loadConfig();
   const accessToken = process.env.FLAGIFY_ACCESS_TOKEN || getAccessToken(config);
   if (!accessToken) throw new MissingAuthError();
+  if (accessToken.startsWith("pk_") || accessToken.startsWith("sk_")) {
+    throw new InvalidTokenError(accessToken.slice(0, 3));
+  }
 
   const apiUrl = resolveApiUrl(config);
   const scope = resolveScope(config);

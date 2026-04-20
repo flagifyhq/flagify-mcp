@@ -21,7 +21,11 @@ export function registerDeleteFlag(server: McpServer): void {
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
-        idempotentHint: false,
+        // Archiving is idempotent at the state level — archiving an already-
+        // archived flag leaves it archived. The API may return 404/409 the
+        // second time, but the observable state doesn't change, which is
+        // what the MCP spec's idempotentHint cares about.
+        idempotentHint: true,
       },
     },
     async ({ flag_key, project_id }) => {

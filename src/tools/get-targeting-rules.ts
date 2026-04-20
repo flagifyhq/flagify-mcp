@@ -2,9 +2,12 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TargetingRule } from "../client/types.js";
 import { getToolContext, requireProjectId } from "./context.js";
+import { resolveFlag, toolError } from "./helpers.js";
 
 const inputSchema = {
-  flag_key: z.string().describe("Flag key (kebab-case)."),
+  flag_key: z
+    .string()
+    .describe("Flag key (kebab-case) or name — resolved fuzzy, case-insensitive."),
   environment: z
     .string()
     .describe("Environment key (e.g. 'development', 'staging', 'production')."),
@@ -26,22 +29,24 @@ export function registerGetTargetingRules(server: McpServer): void {
     async ({ flag_key, environment, project_id }) => {
       const ctx = await getToolContext();
       const projectId = project_id ?? requireProjectId(ctx.scope);
+
+      const flag = await resolveFlag(ctx.client, projectId, flag_key);
+      if (!flag) {
+        return toolError(
+          `No flag matching "${flag_key}" in project ${projectId}. Use list_flags to see available flags.`,
+        );
+      }
+
       const path =
         `/v1/projects/${encodeURIComponent(projectId)}` +
-        `/flags/${encodeURIComponent(flag_key)}` +
+        `/flags/${encodeURIComponent(flag.key)}` +
         `/environments/${encodeURIComponent(environment)}/targeting-rules`;
 
       const res = await ctx.client.get<TargetingRule[]>(path, { cache: true });
       if (res.status !== 200 || !res.body) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Failed to get targeting rules (HTTP ${res.status}): ${res.errorMessage ?? "unknown error"}`,
-            },
-          ],
-        };
+        return toolError(
+          `Failed to get targeting rules (HTTP ${res.status}): ${res.errorMessage ?? "unknown error"}`,
+        );
       }
 
       const rules = res.body;
@@ -50,15 +55,15 @@ export function registerGetTargetingRules(server: McpServer): void {
           content: [
             {
               type: "text",
-              text: `Flag ${flag_key} in ${environment} has no targeting rules (evaluation falls through to the default value).`,
+              text: `Flag ${flag.key} in ${environment} has no targeting rules (evaluation falls through to the default value).`,
             },
           ],
-          structuredContent: { rules: [], flag_key, environment },
+          structuredContent: { rules: [], flag_key: flag.key, environment },
         };
       }
 
       const lines = [
-        `${rules.length} targeting rule(s) on ${flag_key} @ ${environment}:`,
+        `${rules.length} targeting rule(s) on ${flag.key} @ ${environment}:`,
         "",
       ];
       for (const r of rules) {
@@ -91,7 +96,7 @@ export function registerGetTargetingRules(server: McpServer): void {
 
       return {
         content: [{ type: "text", text: lines.join("\n").trimEnd() }],
-        structuredContent: { rules, flag_key, environment },
+        structuredContent: { rules, flag_key: flag.key, environment },
       };
     },
   );

@@ -1,4 +1,5 @@
 import { loadConfig, saveConfig } from "../auth/config.js";
+import { PACKAGE_VERSION } from "../version.js";
 
 export interface ApiClientOptions {
   apiUrl: string;
@@ -35,7 +36,7 @@ export class FlagifyApiClient {
     this.apiUrl = options.apiUrl;
     this.accessToken = options.accessToken;
     this.refreshToken = options.refreshToken;
-    this.userAgent = options.userAgent ?? "flagify-mcp/0.1.0";
+    this.userAgent = options.userAgent ?? `flagify-mcp/${PACKAGE_VERSION}`;
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.cacheTtlMs = Math.max(0, options.cacheTtlSeconds ?? 0) * 1000;
   }
@@ -159,10 +160,10 @@ export class FlagifyApiClient {
           return { status, errorMessage: "invalid JSON response" };
         }
       }
-      return { status, errorMessage: raw.slice(0, 500) };
+      return { status, errorMessage: redactSecrets(raw).slice(0, 500) };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return { status: 0, errorMessage: message };
+      return { status: 0, errorMessage: redactSecrets(message) };
     } finally {
       clearTimeout(timer);
     }
@@ -184,6 +185,19 @@ export class FlagifyApiClient {
       expiresAt: Date.now() + this.cacheTtlMs,
     });
   }
+}
+
+/**
+ * Strip anything that smells like a bearer token or Authorization header out
+ * of error strings before they land in a tool response (which the LLM may
+ * repeat to the user, and the host will log). Belt-and-suspenders against
+ * misbehaving gateways that echo request headers in their 5xx bodies.
+ */
+function redactSecrets(text: string): string {
+  return text
+    .replace(/[Bb]earer\s+[A-Za-z0-9._\-~+/=]+/g, "Bearer [redacted]")
+    .replace(/[Aa]uthorization:\s*[^\s,"}]+/g, "Authorization: [redacted]")
+    .replace(/\b[ps]k_(?:live|test|dev|prod)_[A-Za-z0-9]+/g, "[redacted-api-key]");
 }
 
 async function persistRotatedTokens(

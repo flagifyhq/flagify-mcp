@@ -212,8 +212,9 @@ Pass them through the MCP host's config:
 - Raw debug: pipe a JSON-RPC frame into the binary
 
 ```bash
-printf '%s\n%s\n' \
+printf '%s\n%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
   | npx -y @flagify/mcp
 ```
