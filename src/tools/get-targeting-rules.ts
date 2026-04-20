@@ -64,7 +64,11 @@ export function registerGetTargetingRules(server: McpServer): void {
       for (const r of rules) {
         const desc = r.description ? ` — ${r.description}` : "";
         lines.push(`#${r.priority} [match=${r.matchType}]${desc}`);
-        for (const c of r.conditions) {
+        const conditions = r.conditions ?? [];
+        if (conditions.length === 0) {
+          lines.push(`    (malformed: no conditions — rule will never match)`);
+        }
+        for (const c of conditions) {
           if (c.type === "segment") {
             lines.push(`    in segment ${c.segmentId}`);
           } else {

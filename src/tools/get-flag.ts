@@ -70,7 +70,9 @@ function renderFlagDetail(f: Flag): string {
   lines.push(`Off:     ${JSON.stringify(f.offValue)}`);
   lines.push("");
   lines.push("Environments:");
-  for (const e of f.environments ?? []) {
+  const envs = f.environments ?? [];
+  if (envs.length === 0) lines.push("  (no environments — flag not provisioned)");
+  for (const e of envs) {
     const onoff = e.enabled ? "ON " : "OFF";
     const rules = e.targetingRuleCount > 0 ? `, ${e.targetingRuleCount} rule(s)` : "";
     const rollout =

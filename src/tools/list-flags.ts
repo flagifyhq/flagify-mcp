@@ -56,7 +56,8 @@ function renderFlagsSummary(flags: Flag[], projectId: string): string {
   }
   const lines = [`${flags.length} flag(s) in project ${projectId}:`, ""];
   for (const f of flags) {
-    const envs = (f.environments ?? [])
+    const perEnv = f.environments ?? [];
+    const envs = perEnv
       .map((e) => {
         const onoff = e.enabled ? "on" : "off";
         const rules = e.targetingRuleCount > 0 ? ` (${e.targetingRuleCount} rules)` : "";
