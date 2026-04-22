@@ -146,9 +146,26 @@ flagify login
 flagify projects pick
 ```
 
+The reader understands both schemas: the flat v1 file written by older CLI versions and the multi-account v2 file written by current CLIs. No migration happens from the MCP — if the file needs upgrading, the next `flagify` command does it.
+
 If the access token expires, the server calls `/v1/auth/refresh` with the stored refresh token and writes the rotated pair back to the config file. You won't see a prompt, it just keeps going.
 
 API keys (`pk_*`, `sk_*`) are rejected. Those are scoped to flag evaluation, not management, so any mutation would fail with a 403. Use the JWT flow.
+
+### Pin-at-start
+
+On the first tool call, the MCP server picks exactly one account and uses it for the entire process lifetime. The precedence, highest first:
+
+1. `FLAGIFY_ACCESS_TOKEN` in the env — ephemeral, never persisted back.
+2. `FLAGIFY_PROFILE` in the env — names a profile from `~/.flagify/config.json`.
+3. `current` from the v2 store.
+4. The sole account, when exactly one is signed in.
+
+Running `flagify auth switch <other>` in another terminal **does not** change the account the MCP is acting against. To switch, restart the MCP (most hosts do this when you tweak the server config). This keeps one side of a conversation from silently flipping workspaces mid-task.
+
+An `FLAGIFY_PROFILE` pointing at a name that does not exist in the store fails loud on the first tool call rather than silently falling through to `current`.
+
+When the token rotates, the refresh is written only into the pinned profile's slot — sibling profiles in the same file are never touched, and a profile removed while the MCP is running is not resurrected.
 
 ## Available tools
 
@@ -173,27 +190,39 @@ Everything below is optional. Without it, the server uses whatever `flagify logi
 
 | Variable | Purpose |
 |----------|---------|
+| `FLAGIFY_PROFILE` | Pin the MCP to a specific profile from `~/.flagify/config.json` (v2 schema). Fails loud if the name does not exist |
 | `FLAGIFY_API_URL` | Override the API base URL (e.g. `http://localhost:8080` for local dev) |
-| `FLAGIFY_ACCESS_TOKEN` | Skip the config file; pass a JWT directly (useful in CI) |
-| `FLAGIFY_WORKSPACE_ID` | Override the default workspace |
-| `FLAGIFY_PROJECT_ID` | Override the default project |
+| `FLAGIFY_ACCESS_TOKEN` | Ephemeral JWT — skips the config file entirely and disables token persistence for this run |
+| `FLAGIFY_REFRESH_TOKEN` | Pair the ephemeral access token with a refresh token (also ephemeral) |
+| `FLAGIFY_WORKSPACE_ID` / `FLAGIFY_WORKSPACE` | Override the default workspace |
+| `FLAGIFY_PROJECT_ID` / `FLAGIFY_PROJECT` | Override the default project |
+| `FLAGIFY_ENVIRONMENT` | Override the default environment key |
 
 Pass them through the MCP host's config:
 
 ```json
 {
   "mcpServers": {
-    "flagify": {
+    "flagify-work": {
       "command": "npx",
       "args": ["-y", "@flagify/mcp"],
       "env": {
-        "FLAGIFY_PROJECT_ID": "01J...",
-        "FLAGIFY_API_URL": "http://localhost:8080"
+        "FLAGIFY_PROFILE": "work",
+        "FLAGIFY_PROJECT_ID": "01J..."
+      }
+    },
+    "flagify-personal": {
+      "command": "npx",
+      "args": ["-y", "@flagify/mcp"],
+      "env": {
+        "FLAGIFY_PROFILE": "personal"
       }
     }
   }
 }
 ```
+
+Running two MCP instances with different `FLAGIFY_PROFILE` values is the supported way to let a single host talk to two accounts at once.
 
 ## Troubleshooting
 
