@@ -1,4 +1,3 @@
-import { loadConfig, saveConfig } from "../auth/config.js";
 import { PACKAGE_VERSION } from "../version.js";
 
 export interface ApiClientOptions {
@@ -8,6 +7,13 @@ export interface ApiClientOptions {
   userAgent?: string;
   timeoutMs?: number;
   cacheTtlSeconds?: number;
+  /**
+   * Invoked after the /v1/auth/refresh round-trip rotates tokens. Callers that
+   * want the new tokens persisted (the MCP server does; tests typically don't)
+   * wire this to their store writer. Without a callback, rotated tokens stay
+   * in memory for the current process and are never persisted.
+   */
+  onTokenRotation?: (accessToken: string, refreshToken: string) => Promise<void> | void;
 }
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -31,6 +37,10 @@ export class FlagifyApiClient {
   private timeoutMs: number;
   private cacheTtlMs: number;
   private cache = new Map<string, CacheEntry<unknown>>();
+  private onTokenRotation?: (
+    accessToken: string,
+    refreshToken: string,
+  ) => Promise<void> | void;
 
   constructor(options: ApiClientOptions) {
     this.apiUrl = options.apiUrl;
@@ -39,6 +49,7 @@ export class FlagifyApiClient {
     this.userAgent = options.userAgent ?? `flagify-mcp/${PACKAGE_VERSION}`;
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.cacheTtlMs = Math.max(0, options.cacheTtlSeconds ?? 0) * 1000;
+    this.onTokenRotation = options.onTokenRotation;
   }
 
   async get<T>(path: string, opts: { cache?: boolean } = {}): Promise<ApiResponse<T>> {
@@ -89,7 +100,13 @@ export class FlagifyApiClient {
 
     this.accessToken = refreshed.accessToken;
     this.refreshToken = refreshed.refreshToken;
-    await persistRotatedTokens(refreshed.accessToken, refreshed.refreshToken);
+    if (this.onTokenRotation) {
+      try {
+        await this.onTokenRotation(refreshed.accessToken, refreshed.refreshToken);
+      } catch {
+        // Persistence is best-effort — in-memory tokens are already updated.
+      }
+    }
 
     res = await this.rawRequest<T>(method, path, body, refreshed.accessToken);
     return res;
@@ -200,18 +217,3 @@ function redactSecrets(text: string): string {
     .replace(/\b[ps]k_(?:live|test|dev|prod)_[A-Za-z0-9]+/g, "[redacted-api-key]");
 }
 
-async function persistRotatedTokens(
-  accessToken: string,
-  refreshToken: string,
-): Promise<void> {
-  try {
-    const cfg = await loadConfig();
-    cfg.accessToken = accessToken;
-    cfg.refreshToken = refreshToken;
-    await saveConfig(cfg);
-  } catch {
-    // Token rotation is best-effort — if we can't write the config (e.g. CWD
-    // has no home, read-only FS), the in-memory client state still has the
-    // new tokens for the current session.
-  }
-}

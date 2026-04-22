@@ -1,7 +1,8 @@
 import {
   DEFAULT_API_URL,
   getAccessToken,
-  loadConfig,
+  loadLoadedConfig,
+  persistRotatedTokensForProfile,
   resolveApiUrl,
   resolveScope,
   type FlagifyConfig,
@@ -14,6 +15,10 @@ export interface ToolContext {
   config: FlagifyConfig;
   scope: ResolvedScope;
   apiUrl: string;
+  /** The profile the MCP pinned at startup. "" when reading a v1 config or when tokens come from env. */
+  profile: string;
+  /** True when tokens were provided via FLAGIFY_ACCESS_TOKEN — refreshes never persist. */
+  ephemeral: boolean;
 }
 
 export class MissingAuthError extends Error {
@@ -43,35 +48,98 @@ export class MissingScopeError extends Error {
   }
 }
 
+export class UnknownProfileError extends Error {
+  constructor(profile: string) {
+    super(
+      `FLAGIFY_PROFILE=${profile} was requested but no such profile exists in ~/.flagify/config.json. Run \`flagify auth login --profile ${profile}\` first, or choose an existing profile with \`flagify auth list\`.`,
+    );
+    this.name = "UnknownProfileError";
+  }
+}
+
 let cached: ToolContext | null = null;
 
 /**
- * Lazy-loads the config, builds the API client, and resolves scope. Cached
- * per-process — the MCP server is short-lived and tokens rotate in-memory.
- * Callers that mutate scope (e.g. via per-tool arguments) should clone the
- * returned scope rather than mutating it.
+ * Pin-at-start: the first tool call resolves a single profile (or an
+ * ephemeral env token) and every later call reuses it. A `flagify auth switch`
+ * in another terminal cannot silently change the account this MCP is acting
+ * against — the user must restart the MCP to change profiles.
  */
 export async function getToolContext(): Promise<ToolContext> {
   if (cached) return cached;
 
-  const config = await loadConfig();
-  const accessToken = process.env.FLAGIFY_ACCESS_TOKEN || getAccessToken(config);
+  const envAccessToken = process.env.FLAGIFY_ACCESS_TOKEN?.trim() || "";
+  const envRefreshToken = process.env.FLAGIFY_REFRESH_TOKEN?.trim() || "";
+
+  if (envAccessToken) {
+    if (envAccessToken.startsWith("pk_") || envAccessToken.startsWith("sk_")) {
+      throw new InvalidTokenError(envAccessToken.slice(0, 3));
+    }
+    // Env token path still reads the store for apiUrl / scope defaults, but
+    // persistence and profile pinning are suppressed.
+    const loaded = await loadLoadedConfig();
+    const apiUrl = resolveApiUrl(loaded.config);
+    const scope = resolveScope(loaded.config);
+    const client = new FlagifyApiClient({
+      apiUrl,
+      accessToken: envAccessToken,
+      refreshToken: envRefreshToken || undefined,
+      cacheTtlSeconds: 30,
+      // No onTokenRotation: env tokens are ephemeral by contract.
+    });
+    cached = {
+      client,
+      config: loaded.config,
+      scope,
+      apiUrl,
+      profile: "",
+      ephemeral: true,
+    };
+    return cached;
+  }
+
+  const loaded = await loadLoadedConfig();
+
+  // v2 with FLAGIFY_PROFILE requested but missing → fail loud instead of
+  // silently falling through to the current profile.
+  if (loaded.schema === 2) {
+    const requested = process.env.FLAGIFY_PROFILE?.trim();
+    if (requested && !getAccessToken(loaded.config)) {
+      throw new UnknownProfileError(requested);
+    }
+  }
+
+  const accessToken = getAccessToken(loaded.config);
   if (!accessToken) throw new MissingAuthError();
   if (accessToken.startsWith("pk_") || accessToken.startsWith("sk_")) {
     throw new InvalidTokenError(accessToken.slice(0, 3));
   }
 
-  const apiUrl = resolveApiUrl(config);
-  const scope = resolveScope(config);
+  const apiUrl = resolveApiUrl(loaded.config);
+  const scope = resolveScope(loaded.config);
+
+  // Capture the resolved schema + profile in the closure so later refreshes
+  // write into the pinned slot even if the user flips `current` elsewhere.
+  const { schema, profile } = loaded;
 
   const client = new FlagifyApiClient({
     apiUrl,
     accessToken,
-    refreshToken: config.refreshToken,
+    refreshToken: loaded.config.refreshToken,
     cacheTtlSeconds: 30,
+    onTokenRotation: async (newAccess, newRefresh) => {
+      await persistRotatedTokensForProfile(profile, schema, newAccess, newRefresh);
+    },
   });
 
-  cached = { client, config, scope, apiUrl };
+  cached = {
+    client,
+    config: loaded.config,
+    scope,
+    apiUrl,
+    profile,
+    ephemeral: false,
+  };
   return cached;
 }
 
