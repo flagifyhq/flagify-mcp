@@ -33,7 +33,7 @@
 
 Flagify's [Model Context Protocol](https://modelcontextprotocol.io) server. Lets any MCP host (Claude Desktop, Claude Code, Cursor, Zed, Windsurf) read and change your feature flags without leaving the editor.
 
-- **Zero-config auth** -- reads the same `~/.flagify/config.json` the Flagify CLI writes on `flagify login`
+- **Zero-config auth** -- reads the same `~/.flagify/config.json` the Flagify CLI writes on `flagify auth login`
 - **12 tools** -- list, create, update, toggle, archive; plus environments, segments, targeting rules, and the audit log
 - **Destructive mutations are tagged** with `destructiveHint: true` so hosts can flag them in their consent UI
 - **Every change lands in the audit log** with `source: "mcp"`, so you can tell MCP-driven edits apart from CLI or console ones
@@ -139,7 +139,7 @@ npm install -g @flagify/cli
 ```
 
 ```bash
-flagify login
+flagify auth login
 ```
 
 ```bash
@@ -186,7 +186,7 @@ When the token rotates, the refresh is written only into the pinned profile's sl
 
 ## Configuration
 
-Everything below is optional. Without it, the server uses whatever `flagify login` and `flagify projects pick` put in `~/.flagify/config.json`.
+Everything below is optional. Without it, the server uses whatever `flagify auth login` and `flagify projects pick` put in `~/.flagify/config.json`.
 
 | Variable | Purpose |
 |----------|---------|
@@ -229,9 +229,9 @@ Running two MCP instances with different `FLAGIFY_PROFILE` values is the support
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | "Could not attach to MCP server flagify" | The host's `PATH` when launched from a GUI doesn't include `npx`/`node` | Switch to absolute paths, e.g. `"command": "/opt/homebrew/bin/npx"` |
-| Tool call fails with `MissingAuthError` | No `flagify login` yet | Install `@flagify/cli` and log in |
+| Tool call fails with `MissingAuthError` | No `flagify auth login` yet | Install `@flagify/cli` and log in |
 | Tool call fails with `MissingScopeError` | No default project picked | Run `flagify projects pick`, or set `FLAGIFY_PROJECT_ID` |
-| HTTP 401 after the server tries to refresh | Refresh token expired too | Run `flagify login` again |
+| HTTP 401 after the server tries to refresh | Refresh token expired too | Run `flagify auth login` again |
 | `list_flags` returns stale data | 30-second in-memory cache (intentional) | Do a mutation (invalidates the cache) or restart the host |
 
 ### Logs
@@ -289,7 +289,7 @@ pnpm start
 ```
 src/index.ts            Entry point -- registers all tools + stdio transport
 src/auth/config.ts      Reads/writes ~/.flagify/config.json
-src/auth/browser-login.ts   Port of `flagify login` browser-loopback flow
+src/auth/browser-login.ts   Port of `flagify auth login` browser-loopback flow
 src/client/flagify-api.ts   HTTP client with JWT refresh + X-Flagify-Source header
 src/client/types.ts     Shared API types (Flag, Environment, Segment, ...)
 src/tools/context.ts    Lazy bootstrap of client + scope resolution
