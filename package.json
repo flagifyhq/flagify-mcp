@@ -1,6 +1,6 @@
 {
   "name": "@flagify/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flagify MCP server — manage feature flags from Claude Desktop, Claude Code, Cursor, Zed, Windsurf, and any MCP-capable host.",
   "type": "module",
   "bin": {

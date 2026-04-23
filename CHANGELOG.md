@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/flagifyhq/flagify-mcp/releases/tag/v0.2.0) — 2026-04-23
+
+### Added
+
+- **Multi-account profile support.** The server now reads both the v1 (`token` field) and v2 (multi-profile store) `~/.flagify/config.json` formats, so users who upgraded the CLI to v2.0.0 are supported without any manual migration (#2).
+- **`FLAGIFY_PROFILE` env var.** Set `FLAGIFY_PROFILE=<name>` in the host config to pin the server to a specific named profile instead of the currently active one (#2).
+- **Pin-at-start.** The active profile is resolved and locked when the MCP server initializes. Mid-session profile changes (e.g. `flagify auth switch`) do not affect an already-running server (#2).
+- **Rotation callback.** When the JWT access token is refreshed on a 401, the new token is persisted back to the correct profile slot in the v2 store (or the `token` field in v1), keeping the CLI and MCP in sync (#2).
+- **Dockerfile** for Glama MCP directory verification (#2).
+
 ## [0.1.0] — 2026-04-20
 
 First public release. Stdio MCP server with 12 tools for managing Flagify feature flags from Claude Desktop, Claude Code, Cursor, Zed, Windsurf, and any MCP-compatible host.
