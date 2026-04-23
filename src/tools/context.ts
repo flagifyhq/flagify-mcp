@@ -24,7 +24,7 @@ export interface ToolContext {
 export class MissingAuthError extends Error {
   constructor() {
     super(
-      "No access token found. Run `flagify login` first so the MCP server can read ~/.flagify/config.json, or set FLAGIFY_ACCESS_TOKEN in the host config.",
+      "No access token found. Run `flagify auth login` first so the MCP server can read ~/.flagify/config.json, or set FLAGIFY_ACCESS_TOKEN in the host config.",
     );
     this.name = "MissingAuthError";
   }
@@ -33,7 +33,7 @@ export class MissingAuthError extends Error {
 export class InvalidTokenError extends Error {
   constructor(prefix: string) {
     super(
-      `Found a Flagify API key (${prefix}...) instead of a JWT. API keys can only evaluate flags, not manage them — every mutation will 403. Run \`flagify login\` to get a user JWT, or set FLAGIFY_ACCESS_TOKEN to an access token.`,
+      `Found a Flagify API key (${prefix}...) instead of a JWT. API keys can only evaluate flags, not manage them — every mutation will 403. Run \`flagify auth login\` to get a user JWT, or set FLAGIFY_ACCESS_TOKEN to an access token.`,
     );
     this.name = "InvalidTokenError";
   }

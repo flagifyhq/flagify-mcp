@@ -16,11 +16,11 @@ First public release. Stdio MCP server with 12 tools for managing Flagify featur
 - **Read-only tools** (6): `list_flags`, `get_flag`, `list_environments`, `list_segments`, `get_targeting_rules`, `get_audit_log`.
 - **Mutation tools** (5): `create_flag`, `update_flag`, `delete_flag` (archive), `toggle_flag`, `update_targeting_rules`. All annotated with `destructiveHint: true` so hosts can highlight them in consent prompts.
 - **Health** (1): `ping` returns server version.
-- Auth via JWT access token, shared with the `flagify` CLI (reads `~/.flagify/config.json`). API keys (`pk_*`/`sk_*`) are not accepted — use `flagify login` first.
+- Auth via JWT access token, shared with the `flagify` CLI (reads `~/.flagify/config.json`). API keys (`pk_*`/`sk_*`) are not accepted — use `flagify auth login` first.
 - Automatic JWT refresh on 401 with rotated tokens persisted back to `~/.flagify/config.json`.
 - `X-Flagify-Source: mcp` header on all requests so the API audit log can distinguish MCP-originated changes.
 - Scope resolution (workspace + project) from env vars (`FLAGIFY_WORKSPACE_ID`, `FLAGIFY_PROJECT_ID`) or CLI config defaults.
-- Browser-loopback login module (port of the CLI's `flagify login`) — kept in-tree as `@internal` for a future `login` tool; not wired to any V1 tool.
+- Browser-loopback login module (port of the CLI's `flagify auth login`) — kept in-tree as `@internal` for a future `login` tool; not wired to any V1 tool.
 
 ### Hardening (from the pre-release review)
 
