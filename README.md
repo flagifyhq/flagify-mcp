@@ -33,7 +33,7 @@
 
 Flagify's [Model Context Protocol](https://modelcontextprotocol.io) server. Lets any MCP host (Claude Desktop, Claude Code, Cursor, Zed, Windsurf) read and change your feature flags without leaving the editor.
 
-- **Zero-config auth** -- reads the same `~/.flagify/config.json` the Flagify CLI writes on `flagify login`
+- **Zero-config auth** -- reads the same `~/.flagify/config.json` the Flagify CLI writes on `flagify auth login`
 - **12 tools** -- list, create, update, toggle, archive; plus environments, segments, targeting rules, and the audit log
 - **Destructive mutations are tagged** with `destructiveHint: true` so hosts can flag them in their consent UI
 - **Every change lands in the audit log** with `source: "mcp"`, so you can tell MCP-driven edits apart from CLI or console ones
@@ -139,16 +139,33 @@ npm install -g @flagify/cli
 ```
 
 ```bash
-flagify login
+flagify auth login
 ```
 
 ```bash
 flagify projects pick
 ```
 
+The reader understands both schemas: the flat v1 file written by older CLI versions and the multi-account v2 file written by current CLIs. No migration happens from the MCP — if the file needs upgrading, the next `flagify` command does it.
+
 If the access token expires, the server calls `/v1/auth/refresh` with the stored refresh token and writes the rotated pair back to the config file. You won't see a prompt, it just keeps going.
 
 API keys (`pk_*`, `sk_*`) are rejected. Those are scoped to flag evaluation, not management, so any mutation would fail with a 403. Use the JWT flow.
+
+### Pin-at-start
+
+On the first tool call, the MCP server picks exactly one account and uses it for the entire process lifetime. The precedence, highest first:
+
+1. `FLAGIFY_ACCESS_TOKEN` in the env — ephemeral, never persisted back.
+2. `FLAGIFY_PROFILE` in the env — names a profile from `~/.flagify/config.json`.
+3. `current` from the v2 store.
+4. The sole account, when exactly one is signed in.
+
+Running `flagify auth switch <other>` in another terminal **does not** change the account the MCP is acting against. To switch, restart the MCP (most hosts do this when you tweak the server config). This keeps one side of a conversation from silently flipping workspaces mid-task.
+
+An `FLAGIFY_PROFILE` pointing at a name that does not exist in the store fails loud on the first tool call rather than silently falling through to `current`.
+
+When the token rotates, the refresh is written only into the pinned profile's slot — sibling profiles in the same file are never touched, and a profile removed while the MCP is running is not resurrected.
 
 ## Available tools
 
@@ -169,40 +186,52 @@ API keys (`pk_*`, `sk_*`) are rejected. Those are scoped to flag evaluation, not
 
 ## Configuration
 
-Everything below is optional. Without it, the server uses whatever `flagify login` and `flagify projects pick` put in `~/.flagify/config.json`.
+Everything below is optional. Without it, the server uses whatever `flagify auth login` and `flagify projects pick` put in `~/.flagify/config.json`.
 
 | Variable | Purpose |
 |----------|---------|
+| `FLAGIFY_PROFILE` | Pin the MCP to a specific profile from `~/.flagify/config.json` (v2 schema). Fails loud if the name does not exist |
 | `FLAGIFY_API_URL` | Override the API base URL (e.g. `http://localhost:8080` for local dev) |
-| `FLAGIFY_ACCESS_TOKEN` | Skip the config file; pass a JWT directly (useful in CI) |
-| `FLAGIFY_WORKSPACE_ID` | Override the default workspace |
-| `FLAGIFY_PROJECT_ID` | Override the default project |
+| `FLAGIFY_ACCESS_TOKEN` | Ephemeral JWT — skips the config file entirely and disables token persistence for this run |
+| `FLAGIFY_REFRESH_TOKEN` | Pair the ephemeral access token with a refresh token (also ephemeral) |
+| `FLAGIFY_WORKSPACE_ID` / `FLAGIFY_WORKSPACE` | Override the default workspace |
+| `FLAGIFY_PROJECT_ID` / `FLAGIFY_PROJECT` | Override the default project |
+| `FLAGIFY_ENVIRONMENT` | Override the default environment key |
 
 Pass them through the MCP host's config:
 
 ```json
 {
   "mcpServers": {
-    "flagify": {
+    "flagify-work": {
       "command": "npx",
       "args": ["-y", "@flagify/mcp"],
       "env": {
-        "FLAGIFY_PROJECT_ID": "01J...",
-        "FLAGIFY_API_URL": "http://localhost:8080"
+        "FLAGIFY_PROFILE": "work",
+        "FLAGIFY_PROJECT_ID": "01J..."
+      }
+    },
+    "flagify-personal": {
+      "command": "npx",
+      "args": ["-y", "@flagify/mcp"],
+      "env": {
+        "FLAGIFY_PROFILE": "personal"
       }
     }
   }
 }
 ```
 
+Running two MCP instances with different `FLAGIFY_PROFILE` values is the supported way to let a single host talk to two accounts at once.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | "Could not attach to MCP server flagify" | The host's `PATH` when launched from a GUI doesn't include `npx`/`node` | Switch to absolute paths, e.g. `"command": "/opt/homebrew/bin/npx"` |
-| Tool call fails with `MissingAuthError` | No `flagify login` yet | Install `@flagify/cli` and log in |
+| Tool call fails with `MissingAuthError` | No `flagify auth login` yet | Install `@flagify/cli` and log in |
 | Tool call fails with `MissingScopeError` | No default project picked | Run `flagify projects pick`, or set `FLAGIFY_PROJECT_ID` |
-| HTTP 401 after the server tries to refresh | Refresh token expired too | Run `flagify login` again |
+| HTTP 401 after the server tries to refresh | Refresh token expired too | Run `flagify auth login` again |
 | `list_flags` returns stale data | 30-second in-memory cache (intentional) | Do a mutation (invalidates the cache) or restart the host |
 
 ### Logs
@@ -260,7 +289,7 @@ pnpm start
 ```
 src/index.ts            Entry point -- registers all tools + stdio transport
 src/auth/config.ts      Reads/writes ~/.flagify/config.json
-src/auth/browser-login.ts   Port of `flagify login` browser-loopback flow
+src/auth/browser-login.ts   Port of `flagify auth login` browser-loopback flow
 src/client/flagify-api.ts   HTTP client with JWT refresh + X-Flagify-Source header
 src/client/types.ts     Shared API types (Flag, Environment, Segment, ...)
 src/tools/context.ts    Lazy bootstrap of client + scope resolution
